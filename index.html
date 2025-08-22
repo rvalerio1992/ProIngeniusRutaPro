@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RutaPro – Rutas de Carrera y Meritocracia</title>
+  <!--
+    RutaPro (demo) – Página HTML de un solo archivo, sin dependencias externas.
+    Incluye: Hero con parallax + ruta SVG que se dibuja al hacer scroll,
+    selectores de Área/Familia/Puesto, mapa de rutas (SVG), validador de requisitos,
+    score de meritocracia con regla de decisión y confeti, KPIs, chatbot demo,
+    notas de seguridad/ética y utilidades (modo oscuro/claro, exportar JSON, imprimir).
+
+    Todo el texto, etiquetas y comentarios están en español para facilitar mantenimiento.
+  -->
+  <style>
+    /* ===================== Variables de tema ===================== */
+    :root {
+      --primary: #5b8cff;
+      --primary-2: #7aa2ff;
+      --bg: #0e1116;
+      --bg-2: #141a23;
+      --text: #e8edf2;
+      --muted: #a8b2c3;
+      --card: rgba(255,255,255,0.06);
+      --glass: rgba(255,255,255,0.08);
+      --shadow: 0 10px 30px rgba(0,0,0,.25);
+      --accent: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --ok: #10b981;
+      --pink: #ec4899;
+    }
+    [data-theme="light"] {
+      --bg: #f7f8fb;
+      --bg-2: #ffffff;
+      --text: #0e1116;
+      --muted: #4b5563;
+      --card: rgba(0,0,0,0.05);
+      --glass: rgba(0,0,0,0.06);
+      --shadow: 0 8px 24px rgba(0,0,0,.12);
+    }
+
+    /* ===================== Reset básico ===================== */
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--text);
+      background: radial-gradient(1200px 800px at 10% -10%, rgba(91,140,255,0.25), transparent),
+                  radial-gradient(900px 700px at 120% 10%, rgba(16,185,129,0.18), transparent),
+                  linear-gradient(180deg, var(--bg), var(--bg-2));
+      line-height: 1.55;
+    }
+    a { color: var(--primary); text-decoration: none; }
+    h1,h2,h3 { line-height: 1.2; margin: 0 0 .6rem; }
+    h2 { font-size: clamp(1.2rem, 1rem + 1.2vw, 1.6rem); }
+
+    /* ===================== Utilidades UI ===================== */
+    .container { width: min(1100px, 92vw); margin: 0 auto; }
+    .section { padding: 56px 0; }
+    .card {
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,.08);
+      backdrop-filter: blur(8px);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 18px 18px 16px;
+    }
+    .row { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    @media (min-width: 840px) { .row-3 { grid-template-columns: repeat(3, 1fr); } }
+    @media (min-width: 720px) { .row-2 { grid-template-columns: repeat(2, 1fr); } }
+
+    .btn {
+      appearance: none; border: 0; cursor: pointer; border-radius: 14px; padding: 12px 16px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-2)); color: white;
+      box-shadow: 0 8px 20px rgba(91,140,255,.35); font-weight: 600; transition: transform .12s ease;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn.secondary { background: linear-gradient(135deg, #2dd4bf, #22c55e); box-shadow: 0 8px 20px rgba(34,197,94,.3); }
+    .btn.ghost { background: transparent; border: 1px solid rgba(255,255,255,.18); color: var(--text); }
+
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: .78rem; background: rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); margin: 2px; }
+
+    .muted { color: var(--muted); }
+
+    /* ===================== Barra de progreso (scroll) ===================== */
+    .scrollbar { position: fixed; inset: 0 0 auto 0; height: 4px; background: transparent; z-index: 9999; }
+    .scrollbar > .bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--primary), #10b981, #f59e0b); box-shadow: 0 0 12px rgba(91,140,255,.6); }
+
+    /* ===================== Header/Hero ===================== */
+    header.hero {
+      position: relative; overflow: clip; padding-top: 82px; padding-bottom: 46px;
+    }
+    .hero .bg-bubbles { position: absolute; inset: -20% -10% auto -10%; height: 130%; pointer-events: none; z-index: -1; }
+    .hero .title { font-size: clamp(1.8rem, 1.2rem + 2.8vw, 3rem); letter-spacing: -.02em; }
+    .hero p { font-size: clamp(.98rem, .9rem + .4vw, 1.1rem); }
+    .hero .actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
+    /* SVG Ruta WOW */
+    .wow-wrap { margin-top: 26px; }
+    #wow-svg { width: 100%; height: 220px; }
+    #wow-path { stroke: var(--primary); stroke-width: 4; fill: none; stroke-linecap: round; filter: drop-shadow(0 2px 6px rgba(91,140,255,.5)); }
+    .node { fill: #111827; stroke: #ffffff20; stroke-width: 2; }
+    .node:hover { stroke: #ffffff66; }
+
+    /* Tooltip accesible */
+    .tooltip { position: fixed; pointer-events: none; background: #111827; color: #fff; font-size: .8rem; padding: 6px 8px; border-radius: 8px; border: 1px solid #ffffff22; box-shadow: var(--shadow); opacity: 0; transform: translate(-50%, -120%); transition: opacity .12s ease; z-index: 10000; }
+
+    /* ===================== Controles de selección ===================== */
+    .controls { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .controls label { font-weight: 600; font-size: .9rem; display:block; margin-bottom: 6px; }
+    .controls select { width: 100%; padding: 10px 12px; background: var(--bg-2); border: 1px solid rgba(255,255,255,.12); color: var(--text); border-radius: 12px; }
+
+    /* ===================== Mapa de rutas (SVG) ===================== */
+    .mapa-wrap { overflow: hidden; position: relative; }
+    #mapa-svg { width: 100%; height: 300px; }
+    .puesto-node { fill: var(--glass); stroke: rgba(255,255,255,.18); stroke-width:1; }
+    .puesto-label { font-size: .85rem; fill: var(--text); }
+    .edge { stroke: rgba(255,255,255,.35); stroke-width: 2; }
+
+    /* ===================== Validador ===================== */
+    .checklist { display: grid; grid-template-columns: 1fr; gap: 10px; }
+    .checklist .group { padding: 12px; border-radius: 12px; background: var(--glass); border: 1px solid rgba(255,255,255,.12); }
+    .group h4 { margin: 0 0 8px; }
+    .faltante { color: #ffd166; font-weight: 600; }
+    .ok { color: var(--ok); }
+
+    /* ===================== Score ===================== */
+    .sliders { display: grid; grid-template-columns: 1fr; gap: 10px; }
+    .sliders label { display:flex; gap:10px; justify-content: space-between; align-items: center; }
+    input[type=range] { width: 62%; accent-color: var(--primary); }
+    .score { font-size: 2.2rem; font-weight: 800; }
+    .pill { display:inline-block; padding: 4px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.06); }
+
+    /* Confeti (canvas overlay) */
+    #confetti { position: fixed; inset: 0; pointer-events: none; display:none; z-index: 1000; }
+
+    /* ===================== KPIs ===================== */
+    .kpi { display:flex; align-items:center; gap:14px; }
+    .kpi svg { flex: 0 0 80px; }
+
+    /* ===================== Chatbot ===================== */
+    .chatbox { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+    .chatlog { max-height: 220px; overflow: auto; padding: 10px; border-radius: 12px; background: var(--glass); border:1px solid rgba(255,255,255,.12); }
+    .msg { padding: 8px 10px; border-radius: 10px; margin: 6px 0; }
+    .msg.you { background: rgba(91,140,255,.18); border:1px solid rgba(91,140,255,.32); }
+    .msg.bot { background: rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.16); }
+
+    /* ===================== Header utilidades ===================== */
+    .topbar { position: sticky; top: 0; z-index: 100; backdrop-filter: blur(8px); background: linear-gradient(180deg, rgba(0,0,0,.25), transparent); border-bottom: 1px solid rgba(255,255,255,.08); }
+    .topbar-inner { display:flex; align-items:center; justify-content: space-between; padding: 10px 0; }
+    .switch { display:flex; align-items:center; gap:10px; font-size:.9rem; }
+
+    /* ===================== Accesibilidad movimiento ===================== */
+    @media (prefers-reduced-motion: reduce) {
+      .animate, #wow-path { transition: none !important; animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Barra de progreso de scroll -->
+  <div class="scrollbar" aria-hidden="true"><div class="bar" id="scrollbar"></div></div>
+
+  <!-- Confeti overlay -->
+  <canvas id="confetti" aria-hidden="true"></canvas>
+
+  <div class="topbar">
+    <div class="container topbar-inner">
+      <strong>RutaPro</strong>
+      <div class="switch">
+        <span class="muted">Modo</span>
+        <button class="btn ghost" id="themeToggle" aria-pressed="false" aria-label="Cambiar tema claro/oscuro">🌙</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== HERO ===================== -->
+  <header class="hero section" id="hero">
+    <svg class="bg-bubbles" id="parallax" viewBox="0 0 1200 800" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="rgba(91,140,255,0.35)"/>
+          <stop offset="100%" stop-color="rgba(34,197,94,0.25)"/>
+        </linearGradient>
+      </defs>
+      <circle cx="200" cy="200" r="160" fill="url(#g1)"/>
+      <circle cx="1000" cy="120" r="120" fill="rgba(236,72,153,0.22)"/>
+      <circle cx="900" cy="620" r="200" fill="rgba(16,185,129,0.18)"/>
+    </svg>
+    <div class="container">
+      <h1 class="title">RutaPro – Rutas de Carrera y Meritocracia</h1>
+      <p class="muted">“Del interés del colaborador a la promoción, con datos y equidad”.</p>
+      <div class="actions" role="group" aria-label="Acciones principales">
+        <a class="btn" href="#mapa" id="goExplore">Explorar rutas</a>
+        <a class="btn secondary" href="#score">Calcular mi score</a>
+      </div>
+
+      <!-- Efecto WOW: ruta SVG que se dibuja al hacer scroll -->
+      <div class="wow-wrap" aria-describedby="wow-desc">
+        <svg id="wow-svg" viewBox="0 0 900 200" aria-label="Ruta de ejemplo dibujada al hacer scroll">
+          <path id="wow-path" d="M20,180 C150,100 220,40 320,120 S520,210 650,120 880,20 880,20"/>
+          <!-- Nodos con tooltips -->
+          <g>
+            <circle class="node" data-tip="Analista Jr" cx="20" cy="180" r="8"/>
+            <circle class="node" data-tip="Analista Sr" cx="300" cy="110" r="8"/>
+            <circle class="node" data-tip="Científico de Datos" cx="520" cy="180" r="8"/>
+            <circle class="node" data-tip="Jefe de Analítica" cx="880" cy="20" r="8"/>
+          </g>
+        </svg>
+        <p id="wow-desc" class="muted" style="margin:.2rem 0 0">Desplázate y observa cómo la ruta se traza. Pasa el mouse por los nodos para ver ejemplos de puestos.</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================== Cómo funciona ===================== -->
+  <section class="section" id="como">
+    <div class="container">
+      <h2>Cómo funciona (3 pasos)</h2>
+      <div class="row row-3" style="margin-top:12px">
+        <div class="card">
+          <h3>1) Interés del colaborador</h3>
+          <p class="muted">Selecciona <strong>Área → Familia → Puesto</strong> para explorar rutas verticales u horizontales.</p>
+          <span class="badge">Guía asistida</span>
+        </div>
+        <div class="card">
+          <h3>2) Validación de requisitos</h3>
+          <p class="muted">Revisa <strong>duros</strong> y <strong>blandos</strong> (más historial). Identificamos faltantes y sugerimos acciones.</p>
+          <span class="badge">Transparencia</span>
+        </div>
+        <div class="card">
+          <h3>3) Recomendación y plan</h3>
+          <p class="muted">Proponemos la ruta, próximos pasos y recursos de aprendizaje. Un chatbot puede acompañarte.</p>
+          <span class="badge">Explicabilidad</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Mapa de Rutas ===================== -->
+  <section class="section" id="mapa">
+    <div class="container">
+      <h2>Mapa de rutas (interactivo)</h2>
+      <div class="card">
+        <div class="controls row row-3">
+          <div>
+            <label for="areaSel">Área</label>
+            <select id="areaSel" aria-label="Seleccionar área"></select>
+          </div>
+          <div>
+            <label for="famSel">Familia</label>
+            <select id="famSel" aria-label="Seleccionar familia"></select>
+          </div>
+          <div>
+            <label for="puestoSel">Puesto</label>
+            <select id="puestoSel" aria-label="Seleccionar puesto"></select>
+          </div>
+        </div>
+        <div class="mapa-wrap">
+          <svg id="mapa-svg" viewBox="0 0 900 300" role="img" aria-label="Red de ruta hacia puestos destino"></svg>
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px;">
+          <button class="btn" id="btnVerReq">Ver requisitos</button>
+          <span class="muted" id="rutaResumen" aria-live="polite"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Validador de Requisitos ===================== -->
+  <section class="section" id="validador">
+    <div class="container">
+      <h2>Validador de requisitos</h2>
+      <div class="row row-2" style="margin-top:12px">
+        <div class="card">
+          <h3 id="reqTitle">Requisitos del puesto</h3>
+          <div class="checklist" id="reqList"></div>
+        </div>
+        <div class="card">
+          <h3>Historial</h3>
+          <div class="checklist" id="histList"></div>
+          <div style="margin-top:8px;">
+            <strong>Faltantes:</strong>
+            <div id="faltantes" class="muted"></div>
+            <div id="sugerencias" class="muted" style="margin-top:6px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Score de Meritocracia ===================== -->
+  <section class="section" id="score">
+    <div class="container">
+      <h2>Score de Meritocracia (Micro)</h2>
+      <p class="muted">Fórmula: <strong>Resultados 70%</strong> + <strong>Comportamiento 20%</strong> + <strong>Potencial 10%</strong></p>
+      <div class="row row-2" style="margin-top:10px">
+        <div class="card">
+          <div class="sliders">
+            <label>Resultados <span id="valR">50</span><input id="rangoR" type="range" min="0" max="100" value="50" /></label>
+            <label>Comportamiento <span id="valC">50</span><input id="rangoC" type="range" min="0" max="100" value="50" /></label>
+            <label>Potencial <span id="valP">50</span><input id="rangoP" type="range" min="0" max="100" value="50" /></label>
+          </div>
+          <div style="margin-top:10px">
+            <div>Requisitos cumplidos: <span class="pill" id="pctReq">0%</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div>Score total</div>
+          <div class="score" id="scoreTotal" aria-live="polite">50.0</div>
+          <div>Decisión: <span id="decision" class="badge">—</span></div>
+          <p class="muted" style="margin-top:8px">
+            <strong>Resultados</strong>: objetivos, calidad, eficiencia.<br>
+            <strong>Comportamiento</strong>: colaboración/equipo, valores, innovación/mejora continua.<br>
+            <strong>Potencial</strong>: habilidades adquiridas, adaptabilidad, capacidad de liderazgo.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Macro / Equidad y acceso ===================== -->
+  <section class="section" id="macro">
+    <div class="container">
+      <h2>Macro – Equidad y acceso</h2>
+      <div class="row row-3" style="margin-top:12px">
+        <div class="card">
+          <h3>Encuesta de percepción</h3>
+          <p class="muted">Placeholder para pulso trimestral sobre acceso a rutas y meritocracia. Ítems tipo Likert (ej.: “Tengo visibilidad de rutas disponibles”).</p>
+          <span class="badge">Próximo: integración con LMS</span>
+        </div>
+        <div class="card">
+          <h3>Benchmark interno</h3>
+          <p class="muted">Compara por área/familia: tasa de movilidad, brechas promedio y tiempo a promoción.</p>
+          <span class="badge">Equidad</span>
+        </div>
+        <div class="card">
+          <h3>Indicadores de acceso</h3>
+          <p class="muted">Seguimiento de postulaciones, elegibilidad y avance. Alertas cuando hay disparidades.</p>
+          <span class="badge">Alertas</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== KPIs y Reportería ===================== -->
+  <section class="section" id="kpis">
+    <div class="container">
+      <h2>KPIs y reportería</h2>
+      <div class="row row-3" style="margin-top:12px">
+        <div class="card kpi" id="kpi-interesados"></div>
+        <div class="card kpi" id="kpi-enruta"></div>
+        <div class="card kpi" id="kpi-noobjetivos"></div>
+        <div class="card kpi" id="kpi-requisito"></div>
+        <div class="card kpi" id="kpi-cobertura"></div>
+        <div class="card kpi" id="kpi-tiempo"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Chatbot de Carrera (demo) ===================== -->
+  <section class="section" id="chat">
+    <div class="container">
+      <h2>Chatbot de carrera (demo)</h2>
+      <div class="card">
+        <div class="chatlog" id="chatlog" aria-live="polite"></div>
+        <div class="chatbox" style="margin-top:10px">
+          <input id="chatInput" placeholder="Ej.: Quiero ir a Analítica de Riesgo" aria-label="Escribe tu interés" />
+          <button class="btn" id="chatSend">Enviar</button>
+        </div>
+        <p class="muted" style="margin-top:8px">Demo sin datos reales. La explicabilidad muestra por qué se sugiere una ruta y qué brechas existen.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Seguridad y Ética ===================== -->
+  <section class="section" id="etica">
+    <div class="container">
+      <h2>Seguridad y ética</h2>
+      <div class="card">
+        <ul>
+          <li>Privacidad por diseño: minimización de datos, roles y trazabilidad.</li>
+          <li>Sesgos: auditorías periódicas y revisión humana obligatoria para decisiones críticas.</li>
+          <li>Transparencia: todo puntaje y recomendación debe ser explicable.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Footer / CTA ===================== -->
+  <footer class="section" id="cta">
+    <div class="container">
+      <div class="row row-2">
+        <div class="card">
+          <h3>¿Listo para compartir?</h3>
+          <p class="muted">Descarga una versión imprimible o exporta tu selección (área/familia/puesto, requisitos y score).</p>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn" id="btnPrint">Descargar PDF</button>
+            <button class="btn secondary" id="btnExport">Exportar selección</button>
+            <button class="btn ghost" id="btnReset">Resetear demo</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Ayuda</h3>
+          <p class="muted">Pulsa los iconos <span class="badge">i</span> para ver tips. Navega con teclado en todos los controles.</p>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Tooltip flotante -->
+  <div id="tooltip" class="tooltip" role="tooltip" aria-hidden="true"></div>
+
+  <script>
+    // ===================== Estado global (demo) =====================
+    const state = {
+      data: {},
+      seleccion: { area: null, familia: null, puesto: null, destino: null },
+      requisitosCumplidos: new Set(),
+      historialCumplido: new Set(),
+      requisitosActuales: [],
+      historialActual: [],
+    };
+
+    // ===================== Datos de ejemplo =====================
+    function sembrarDatos() {
+      // 3 áreas → familias comunes → ~15 puestos en total
+      const familias = ["Analítica", "Crédito", "Operaciones"];
+
+      const puestosBase = {
+        Analítica: [
+          "Analista Jr", "Analista Sr", "Científico de Datos", "Ingeniero de Datos", "Jefe de Analítica"
+        ],
+        Crédito: [
+          "Oficial de Crédito", "Analista de Riesgo", "Gerente de Crédito", "Modelador de Riesgo", "Chief Risk Analyst"
+        ],
+        Operaciones: [
+          "Analista de Operaciones", "Jefe de Sucursal", "Product Owner", "Scrum Master", "DevOps", "Analista de Ciber"
+        ]
+      };
+
+      // Generar requisitos por puesto
+      function genReq(puesto) {
+        const poolDuros = [
+          "SQL avanzado", "Python", "Power BI", "Modelado estadístico", "Gestión de proyectos",
+          "Conocimiento regulatorio", "Atención a auditorías", "Automatización ETL", "Seguridad de la información",
+          "Análisis financiero", "Servicio al cliente", "Experiencia en banca"
+        ];
+        const poolBlandos = [
+          "Comunicación", "Liderazgo", "Trabajo en equipo", "Innovación", "Pensamiento crítico", "Gestión del cambio"
+        ];
+        const req = [];
+        const count = 6 + Math.floor(Math.random()*3); // 6–8
+        // Mezclar aleatoriamente distintos requisitos
+        for (let i=0; i<count; i++) {
+          const src = Math.random() < .7 ? poolDuros : poolBlandos;
+          const r = src[Math.floor(Math.random()*src.length)];
+          if (!req.includes(r)) req.push(r);
+        }
+        return req;
+      }
+
+      // Historial base
+      const historialBase = [
+        "≥ 2 años en rol actual", "Proyecto liderado", "Curso reciente (≤12m)", "Mentoría recibida",
+        "Evaluación de desempeño ≥ 80", "Participación en comité"
+      ];
+
+      // Armar estructura Área → Familia → Puestos
+      const areas = ["Riesgo", "Banca Personas", "TI / Datos"];
+      const data = {};
+      for (const area of areas) {
+        data[area] = {};
+        for (const fam of familias) {
+          data[area][fam] = { puestos: {} };
+          for (const p of puestosBase[fam]) {
+            data[area][fam].puestos[p] = {
+              requisitos: genReq(p),
+              historial: [...historialBase],
+            };
+          }
+        }
+      }
+
+      // Mapa de destinos (rutas); 3–5 por puesto
+      const allPuestos = Object.values(puestosBase).flat();
+      const destinos = {};
+      for (const fam of Object.keys(puestosBase)) {
+        for (const p of puestosBase[fam]) {
+          const opciones = new Set();
+          while (opciones.size < 4) {
+            const cand = allPuestos[Math.floor(Math.random()*allPuestos.length)];
+            if (cand !== p) opciones.add(cand);
+          }
+          destinos[p] = Array.from(opciones);
+        }
+      }
+
+      return { data, destinos };
+    }
+
+    // ===================== Inicialización de selectores =====================
+    function poblarSelectores() {
+      const areaSel = document.getElementById('areaSel');
+      const famSel = document.getElementById('famSel');
+      const puestoSel = document.getElementById('puestoSel');
+
+      // Limpiar
+      areaSel.innerHTML = famSel.innerHTML = puestoSel.innerHTML = '';
+
+      for (const area of Object.keys(state.data)) {
+        const opt = document.createElement('option'); opt.value = opt.textContent = area; areaSel.appendChild(opt);
+      }
+      areaSel.addEventListener('change', _ => poblarFamilias());
+      famSel.addEventListener('change', _ => poblarPuestos());
+      puestoSel.addEventListener('change', _ => { state.seleccion.puesto = puestoSel.value; renderMapa(); });
+
+      function poblarFamilias() {
+        famSel.innerHTML = ''; puestoSel.innerHTML='';
+        state.seleccion.area = areaSel.value;
+        for (const fam of Object.keys(state.data[state.seleccion.area])) {
+          const opt = document.createElement('option'); opt.value = opt.textContent = fam; famSel.appendChild(opt);
+        }
+        state.seleccion.familia = famSel.value;
+        poblarPuestos();
+      }
+      function poblarPuestos() {
+        puestoSel.innerHTML = '';
+        state.seleccion.familia = famSel.value;
+        const puestos = state.data[state.seleccion.area][state.seleccion.familia].puestos;
+        for (const p of Object.keys(puestos)) {
+          const opt = document.createElement('option'); opt.value = opt.textContent = p; puestoSel.appendChild(opt);
+        }
+        state.seleccion.puesto = puestoSel.value;
+        renderMapa();
+      }
+
+      poblarFamilias();
+    }
+
+    // ===================== Mapa SVG de rutas =====================
+    function renderMapa() {
+      const svg = document.getElementById('mapa-svg');
+      svg.innerHTML = '';
+      const { puesto } = state.seleccion;
+      if (!puesto) return;
+
+      const destinos = window._destinos[puesto] || [];
+      const cx0 = 140, cy0 = 150; // nodo origen
+
+      // Origen
+      const g0 = svgEl('g');
+      const n0 = svgEl('circle', { cx: cx0, cy: cy0, r: 26, class: 'puesto-node' });
+      const t0 = svgEl('text', { x: cx0, y: cy0+4, 'text-anchor': 'middle', class:'puesto-label' }); t0.textContent = 'Actual';
+      g0.append(n0, t0); svg.append(g0);
+
+      // Título
+      const top = svgEl('text', { x: 20, y: 24, class:'puesto-label' }); top.textContent = `Puesto actual: ${puesto}`; svg.append(top);
+
+      // Destinos en columna derecha
+      const x1 = 700;
+      const gap = 220 / Math.max(1, destinos.length-1);
+      const resumen = [];
+      destinos.forEach((d, i) => {
+        const y = 40 + i*gap;
+        const g = svgEl('g', { class: 'dest', tabindex: 0 });
+        const c = svgEl('rect', { x: x1-70, y: y-18, rx: 10, ry: 10, width: 160, height: 36, class:'puesto-node' });
+        const t = svgEl('text', { x: x1+10, y: y+5, class:'puesto-label' }); t.textContent = d;
+        const e = svgEl('path', { d: `M ${cx0+26} ${cy0} C 360 ${cy0}, 520 ${y}, ${x1-80} ${y}`, class:'edge' });
+        g.append(c,t); svg.append(e,g);
+        g.addEventListener('click', () => { state.seleccion.destino = d; document.getElementById('rutaResumen').textContent = `Ruta seleccionada: ${puesto} → ${d}`; });
+        g.addEventListener('keydown', (ev)=>{ if(ev.key==='Enter'||ev.key===' ') g.click(); });
+        // Badges de prerequisitos (muestras)
+        const prereq = (state.data[state.seleccion.area][state.seleccion.familia].puestos[d]?.requisitos || []).slice(0,3);
+        if (prereq.length) {
+          let bx = x1-68, by = y+28;
+          prereq.forEach(pr => {
+            const l = svgEl('text', { x: bx, y: by, class:'puesto-label' });
+            l.textContent = `• ${pr}`; l.style.fontSize = '.7rem'; l.style.fill = 'var(--muted)';
+            svg.append(l); by += 16;
+          });
+        }
+        resumen.push(d);
+      });
+
+      document.getElementById('rutaResumen').textContent = `Sugerencias destino: ${resumen.slice(0,3).join(', ')}${resumen.length>3?'…':''}`;
+    }
+
+    // ===================== Validador: relleno y lógica =====================
+    function verRequisitos() {
+      const { area, familia, puesto, destino } = state.seleccion;
+      const foco = destino || puesto;
+      const info = buscarPuesto(foco);
+      if (!info) return;
+      const reqList = document.getElementById('reqList');
+      const histList = document.getElementById('histList');
+      const reqTitle = document.getElementById('reqTitle');
+      reqList.innerHTML = histList.innerHTML = '';
+      reqTitle.textContent = `Requisitos del puesto: ${foco}`;
+
+      state.requisitosActuales = info.requisitos;
+      state.historialActual = info.historial;
+      state.requisitosCumplidos.clear();
+      state.historialCumplido.clear();
+
+      // Crear checklists
+      info.requisitos.forEach((r, idx) => reqList.append(checkItem(r, 'req', idx)));
+      info.historial.forEach((h, idx) => histList.append(checkItem(h, 'hist', idx)));
+
+      actualizarFaltantes();
+    }
+
+    function checkItem(texto, tipo, idx) {
+      const wrap = document.createElement('div'); wrap.className = 'group';
+      const id = `${tipo}-${idx}`;
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = id; cb.setAttribute('aria-describedby', `${id}-label`);
+      cb.addEventListener('change', () => {
+        const set = tipo==='req'? state.requisitosCumplidos : state.historialCumplido;
+        if (cb.checked) set.add(texto); else set.delete(texto);
+        actualizarFaltantes();
+      });
+      const label = document.createElement('label'); label.id = `${id}-label`; label.innerHTML = texto;
+      wrap.append(cb, label);
+      return wrap;
+    }
+
+    function actualizarFaltantes() {
+      const faltantes = state.requisitosActuales.filter(r => !state.requisitosCumplidos.has(r));
+      const faltHist = state.historialActual.filter(h => !state.historialCumplido.has(h));
+
+      document.getElementById('faltantes').innerHTML = (faltantes.concat(faltHist)).map(x=>`<span class='faltante'>${x}</span>`).join(', ') || '<span class="ok">Sin faltantes</span>';
+      // Sugerencias ficticias
+      document.getElementById('sugerencias').textContent = faltantes.length ? `Sugerido: curso rápido de ${faltantes[0]} y mentoría interna.` : '¡Excelente! Considera compartir tu experiencia como mentor.';
+
+      // % requisitos cumplidos → para regla de decisión del score
+      const total = state.requisitosActuales.length;
+      const pct = total ? Math.round((state.requisitosCumplidos.size / total)*100) : 0;
+      document.getElementById('pctReq').textContent = pct + '%';
+      state.pctReq = pct;
+      calcularScore();
+    }
+
+    function buscarPuesto(p) {
+      const { area, familia } = state.seleccion;
+      // Intento directo
+      const directo = state.data?.[area]?.[familia]?.puestos?.[p];
+      if (directo) return directo;
+      // Buscar en todas las familias del área
+      for (const fam of Object.keys(state.data[area]||{})) {
+        if (state.data[area][fam].puestos[p]) return state.data[area][fam].puestos[p];
+      }
+      return null;
+    }
+
+    // ===================== Score y regla de decisión =====================
+    function calcularScore() {
+      const r = +document.getElementById('rangoR').value;
+      const c = +document.getElementById('rangoC').value;
+      const p = +document.getElementById('rangoP').value;
+      document.getElementById('valR').textContent = r; document.getElementById('valC').textContent = c; document.getElementById('valP').textContent = p;
+      const score = +(r*0.7 + c*0.2 + p*0.1).toFixed(1);
+      document.getElementById('scoreTotal').textContent = score.toFixed(1);
+
+      const pct = state.pctReq || 0; let dec = '—';
+      if (score>=85 && pct>=90) { dec = 'Ready Now'; lanzarConfeti(); }
+      else if (score>=70) dec = 'Ready Soon';
+      else dec = 'Build Skills First';
+      const dEl = document.getElementById('decision'); dEl.textContent = dec; dEl.style.background = dec==='Ready Now'? 'rgba(34,197,94,.2)': dec==='Ready Soon'? 'rgba(245,158,11,.2)': 'rgba(239,68,68,.2)';
+    }
+
+    // Confeti sencillo en canvas
+    function lanzarConfeti() {
+      const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (prefersReduced) return;
+      const cv = document.getElementById('confetti');
+      const ctx = cv.getContext('2d');
+      cv.style.display = 'block';
+      const W = cv.width = window.innerWidth; const H = cv.height = window.innerHeight;
+      const piezas = Array.from({length: 120}, _ => ({
+        x: Math.random()*W, y: -10, vy: 2+Math.random()*3, vx: -1+Math.random()*2, size: 6+Math.random()*8, life: 0, max: 140+Math.random()*80,
+        color: `hsl(${Math.floor(Math.random()*360)},80%,60%)`
+      }));
+      let raf; function tick(){
+        ctx.clearRect(0,0,W,H);
+        let vivos = 0;
+        piezas.forEach(p=>{ p.life++; p.y+=p.vy; p.x+=p.vx; ctx.fillStyle=p.color; ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.life/10); ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size); ctx.restore(); if(p.life<p.max) vivos++; });
+        if (vivos>0) raf=requestAnimationFrame(tick); else { cancelAnimationFrame(raf); cv.style.display='none'; }
+      }
+      tick();
+      setTimeout(()=>{ cv.style.display='none'; }, 3000);
+    }
+
+    // ===================== KPIs (mini SVGs) =====================
+    function renderKPIs() {
+      const rnd = (min,max)=> Math.round(min + Math.random()*(max-min));
+      const interesados = rnd(180, 260);
+      const enRutaV = rnd(40, 70), enRutaH = rnd(30, 60);
+      const noObj = rnd(12, 40);
+      const cobertura = rnd(48, 72);
+      const tiempoProm = rnd(4, 9); // meses
+
+      kpi('#kpi-interesados', 'Interesados', interesados, sparkbar([50,60,80,interesados%100]));
+      kpi('#kpi-enruta', 'En ruta V/H', `${enRutaV}% / ${enRutaH}%`, donut((enRutaV+enRutaH)/2));
+      kpi('#kpi-noobjetivos', 'No cumplen objetivos', `${noObj}%`, donut(noObj, true));
+      kpi('#kpi-requisito', 'Requisito menos cumplido', 'SQL avanzado', badgeList(['Python', 'Gestión de proyectos', 'Seguridad']));
+      kpi('#kpi-cobertura', 'Cobertura interna de vacantes', `${cobertura}%`, donut(cobertura));
+      kpi('#kpi-tiempo', 'Tiempo a promoción', `${tiempoProm} m`, sparkbar([8,7,6,tiempoProm]));
+
+      function kpi(sel, titulo, valor, viz) {
+        const el = document.querySelector(sel); el.innerHTML = '';
+        const s = document.createElement('div'); s.innerHTML = `<div><strong>${titulo}</strong></div><div class='muted'>${valor}</div>`; el.appendChild(viz); el.appendChild(s);
+      }
+      function donut(pct, danger=false){
+        const R=36, C=2*Math.PI*R; const v=Math.max(0,Math.min(100,pct)); const off = C*(1 - v/100);
+        const svg = svgEl('svg',{viewBox:'0 0 100 100'});
+        svg.append(svgEl('circle',{cx:50,cy:50,r:R,fill:'none',stroke:'rgba(255,255,255,.16)',"stroke-width":10}));
+        const col = danger? 'var(--danger)': 'var(--primary)';
+        svg.append(svgEl('circle',{cx:50,cy:50,r:R,fill:'none',stroke:col,"stroke-width":10, 'stroke-dasharray':C, 'stroke-dashoffset':off, 'transform':'rotate(-90 50 50)'}));
+        const t = svgEl('text',{x:50,y:54,'text-anchor':'middle',class:'puesto-label'}); t.textContent=v+'%'; svg.append(t); return svg;
+      }
+      function sparkbar(vals){
+        const svg = svgEl('svg',{viewBox:'0 0 100 60'});
+        const max = Math.max(...vals,1);
+        vals.forEach((v,i)=>{ const h = v/max*48; const r = svgEl('rect',{x: 8+i*22, y: 54-h, width: 16, height: h, fill:'rgba(255,255,255,.35)'}); svg.append(r); });
+        return svg;
+      }
+      function badgeList(arr){
+        const wrap = document.createElement('div');
+        arr.forEach(a=>{ const b=document.createElement('span'); b.className='badge'; b.textContent=a; wrap.appendChild(b); });
+        return wrap;
+      }
+    }
+
+    // ===================== Chatbot demo =====================
+    function chatbotInit(){
+      const log = document.getElementById('chatlog');
+      const inp = document.getElementById('chatInput');
+      const btn = document.getElementById('chatSend');
+      const send = ()=>{ const txt=inp.value.trim(); if(!txt) return; addMsg(txt,'you'); responder(txt); inp.value=''; };
+      btn.addEventListener('click', send); inp.addEventListener('keydown', e=>{ if(e.key==='Enter') send(); });
+
+      function addMsg(text, who){ const d=document.createElement('div'); d.className='msg '+who; d.textContent=text; log.appendChild(d); log.scrollTop=log.scrollHeight; }
+
+      function responder(text){
+        // Heurística: detectar palabras clave y proponer ruta y brechas
+        const keys = {
+          analitica: ['Analista Sr','Científico de Datos','Jefe de Analítica'],
+          riesgo: ['Analista de Riesgo','Modelador de Riesgo','Chief Risk Analyst'],
+          credito:['Oficial de Crédito','Gerente de Crédito'],
+          datos:['Ingeniero de Datos','DevOps'],
+          ciber:['Analista de Ciber']
+        };
+        const lower = text.toLowerCase(); let match = null;
+        for (const k of Object.keys(keys)) { if(lower.includes(k)) { match = keys[k]; break; } }
+        const destino = (match? match[0]: window._destinos[state.seleccion.puesto]?.[0]) || 'Analista Sr';
+        const info = buscarPuesto(destino) || { requisitos: ["SQL avanzado"], historial:["Proyecto liderado"] };
+        const brechas = info.requisitos.slice(0,2).join(', ');
+        const porQue = `Coincidencia por palabras clave y afinidad de familia a partir del puesto actual "${state.seleccion.puesto}".`;
+        addMsg(`Sugerencia: ${state.seleccion.puesto} → ${destino}. Faltantes: ${brechas}.`, 'bot');
+        addMsg(`Por qué: ${porQue} Próximos pasos: curso enfocado y proyecto guiado.`, 'bot');
+      }
+    }
+
+    // ===================== Efecto WOW: ruta que se dibuja con scroll =====================
+    function wowInit(){
+      const path = document.getElementById('wow-path');
+      const svg = document.getElementById('wow-svg');
+      const total = path.getTotalLength();
+      path.style.strokeDasharray = total;
+      path.style.strokeDashoffset = total;
+
+      function update(){
+        const rect = svg.getBoundingClientRect();
+        const vh = window.innerHeight;
+        // Progreso del scroll dentro del hero-SVG
+        const visible = Math.max(0, Math.min(rect.bottom, vh) - Math.max(rect.top, 0));
+        const ratio = Math.max(0, Math.min(1, visible / rect.height));
+        const draw = total * ratio;
+        path.style.strokeDashoffset = Math.max(0, total - draw);
+      }
+      const io = new IntersectionObserver((ents)=>{ if(ents[0].isIntersecting){ window.addEventListener('scroll', update, {passive:true}); update(); } else { window.removeEventListener('scroll', update); } }, { threshold:[0,1] });
+      io.observe(svg);
+
+      // Tooltips en nodos
+      const tip = document.getElementById('tooltip');
+      svg.querySelectorAll('.node').forEach(n => {
+        n.addEventListener('mouseenter', (e)=>{ tip.textContent = n.dataset.tip; tip.style.opacity = 1; tip.setAttribute('aria-hidden','false'); });
+        n.addEventListener('mousemove', (e)=>{ tip.style.left = e.clientX+'px'; tip.style.top = e.clientY+'px'; });
+        n.addEventListener('mouseleave', ()=>{ tip.style.opacity = 0; tip.setAttribute('aria-hidden','true'); });
+      });
+    }
+
+    // ===================== Parallax leve del fondo del hero =====================
+    function parallaxInit(){
+      const el = document.getElementById('parallax');
+      const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (prefersReduced) return;
+      function tick(){
+        const y = window.scrollY * 0.08; const x = window.scrollY * 0.02;
+        el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+        requestAnimationFrame(()=>{});
+      }
+      window.addEventListener('scroll', tick, {passive:true});
+    }
+
+    // ===================== Scroll progressbar =====================
+    function progressInit(){
+      const bar = document.getElementById('scrollbar');
+      function onScroll(){ const p = (window.scrollY)/(document.body.scrollHeight - window.innerHeight); bar.style.width = (p*100)+"%"; }
+      window.addEventListener('scroll', onScroll, {passive:true}); onScroll();
+    }
+
+    // ===================== Utilidades/Acciones =====================
+    function utilidadesInit(){
+      document.getElementById('btnPrint').addEventListener('click', ()=> window.print());
+      document.getElementById('btnExport').addEventListener('click', ()=>{
+        const out = {
+          seleccion: state.seleccion,
+          pctRequisitos: state.pctReq||0,
+          score: document.getElementById('scoreTotal').textContent
+        };
+        const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
+        const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='rutapro_export.json'; a.click(); URL.revokeObjectURL(a.href);
+      });
+      document.getElementById('btnReset').addEventListener('click', ()=>{ state.seleccion.destino=null; verRequisitos(); calcularScore(); });
+      document.getElementById('btnVerReq').addEventListener('click', verRequisitos);
+      document.getElementById('rangoR').addEventListener('input', calcularScore);
+      document.getElementById('rangoC').addEventListener('input', calcularScore);
+      document.getElementById('rangoP').addEventListener('input', calcularScore);
+      document.getElementById('goExplore').addEventListener('click', ()=> setTimeout(()=>document.getElementById('areaSel').focus(), 200));
+
+      // Tema claro/oscuro
+      const toggle = document.getElementById('themeToggle');
+      toggle.addEventListener('click', ()=>{
+        const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+        document.documentElement.setAttribute('data-theme', isDark? 'light': 'dark');
+        toggle.textContent = isDark? '☀️' : '🌙';
+        toggle.setAttribute('aria-pressed', (!isDark).toString());
+      });
+    }
+
+    // ===================== Helpers =====================
+    function svgEl(tag, attrs={}){ const el=document.createElementNS('http://www.w3.org/2000/svg', tag); for(const k in attrs) el.setAttribute(k, attrs[k]); return el; }
+
+    // ===================== Boot =====================
+    (function init(){
+      // Sembrar datos
+      const { data, destinos } = sembrarDatos();
+      state.data = data; window._destinos = destinos;
+      poblarSelectores(); renderMapa(); verRequisitos(); calcularScore(); renderKPIs(); chatbotInit(); wowInit(); parallaxInit(); progressInit(); utilidadesInit();
+    })();
+  </script>
+</body>
+</html>
